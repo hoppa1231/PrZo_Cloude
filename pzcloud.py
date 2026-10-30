@@ -24,7 +24,7 @@ import uuid
 import webbrowser
 import zipfile
 
-VERSION = '0.4.0-preview'
+VERSION = '0.4.1-preview'
 # A PyInstaller build unpacks code into a temp dir; data must live next to the .exe.
 HERE = (pathlib.Path(sys.executable) if getattr(sys, 'frozen', False) else pathlib.Path(__file__)).resolve().parent
 CONFIG_FILE = HERE / 'pzcloud-config.json'
@@ -636,11 +636,14 @@ def launch_game():
         if os.name == 'nt':
             os.startfile(uri)
         else:
+            # Prefer native Steam: Wine often hijacks the steam:// handler that xdg-open would use.
+            steam = shutil.which('steam')
             opener = shutil.which('xdg-open')
-            if opener:
+            if steam:
+                subprocess.Popen([steam, '-applaunch', GAME_ID], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                                 start_new_session=True)
+            elif opener:
                 subprocess.Popen([opener, uri], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
-            elif shutil.which('steam'):
-                subprocess.Popen(['steam', '-applaunch', GAME_ID], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             else:
                 die('Не найден Steam или xdg-open; откройте игру вручную.')
     except OSError as exc:
@@ -681,12 +684,14 @@ def begin():
     say('Откройте Хост и выберите профиль ' + cfg['server'] + '. Остальные входят через Steam.')
     say('ВАЖНО: после игры дождитесь полного выхода из Project Zomboid.')
     say('Автоматически отслеживаю процесс игры (не на всех конфигурациях Steam/Proton надёжно).')
-    for _ in range(90):
+    say('Если игра не открылась сама за минуту — запустите Project Zomboid из Steam вручную, я подожду.')
+    # Generous: Steam updates, shader caches and Proton first runs can take minutes.
+    for _ in range(300):
         if has_game():
             break
         time.sleep(2)
     else:
-        say('Процесс игры не обнаружен. Не публикую файлы автоматически: после игры нажмите «Выгрузить мир» (пункт 4).')
+        say('Процесс игры не обнаружен за 10 минут. Не публикую файлы автоматически: после игры нажмите «Выгрузить мир» (пункт 4).')
         return
     say('Игра запущена; ожидаю её закрытия…')
     while has_game():
