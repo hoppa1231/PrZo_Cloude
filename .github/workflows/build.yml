@@ -1,0 +1,44 @@
+name: build
+
+# Push a tag like v0.4.0 to publish a Release with ready-to-run builds,
+# or start the workflow by hand to just get the artifacts.
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - os: windows-latest
+            exe: PZCloudCoop.exe
+            asset: PZCloudCoop-windows.zip
+          - os: ubuntu-22.04
+            exe: PZCloudCoop
+            asset: PZCloudCoop-linux.zip
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install pyinstaller==6.11.1
+      - run: pyinstaller --onefile --windowed --name PZCloudCoop pzcloud_gui.py
+      - name: Package
+        shell: bash
+        run: |
+          cp README_RU.md pzcloud-defaults.example.json dist/
+          cd dist && python -m zipfile -c "../${{ matrix.asset }}" "${{ matrix.exe }}" README_RU.md pzcloud-defaults.example.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.asset }}
+          path: ${{ matrix.asset }}
+      - if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ matrix.asset }}

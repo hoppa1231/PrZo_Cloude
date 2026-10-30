@@ -1,0 +1,13 @@
+# Personal data: never commit
+pzcloud-config.json
+pzcloud-session.json
+pzcloud-defaults.json
+rclone.conf
+rclone.conf.new
+rclone-bin/
+local-backups/
+
+__pycache__/
+build/
+dist/
+*.spec
