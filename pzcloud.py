@@ -525,6 +525,29 @@ def setup_defaults():
     return {**base, **shipped, **old}
 
 
+def check_shared_folder(cfg):
+    p = rc('lsf', remote(cfg), capture=True, allow_failure=True)
+    if p.returncode == 0:
+        return
+    if 'not found' not in (p.stderr or '').lower():
+        die('Нет доступа к ' + cfg['remote'] + ':\n' + (p.stderr or '').strip()[-500:])
+    # The usual cause: the friend has not accepted the shared-folder invitation yet.
+    root = cfg['remote'].split(':', 1)[0] + ':'
+    listing = rc('lsf', root, '--dirs-only', capture=True, allow_failure=True)
+    folders = [d.rstrip('/') for d in listing.stdout.splitlines()] if listing.returncode == 0 else []
+    folder = cfg['remote'].split(':', 1)[1]
+    similar = [d for d in folders if d.lower().startswith(folder.lower()[:5])]
+    message = (f'На вашем Яндекс Диске нет папки «{folder}».\n\n'
+               'Если папку создал друг: откройте disk.yandex.ru под СВОИМ аккаунтом → «Общий доступ» '
+               'и примите приглашение. Если приглашения нет — попросите владельца пригласить ваш '
+               'Яндекс-аккаунт с правом «Редактирование».')
+    if similar:
+        message += '\n\nПохожие папки у вас: ' + ', '.join(similar) + ' — возможно, нужно указать одну из них.'
+    elif folders:
+        message += '\n\nСейчас в корне вашего Диска: ' + ', '.join(folders[:12])
+    die(message)
+
+
 def save_setup(user, srv, rem, zomboid):
     user, srv, rem = user.strip(), srv.strip(), rem.strip().rstrip('/')
     if not user:
@@ -535,7 +558,7 @@ def save_setup(user, srv, rem, zomboid):
     if not cfg['remote'].count(':') == 1 or not cfg['remote'].split(':', 1)[0]:
         die('Некорректный путь в облаке (пример: yadisk:PZ-Shared).')
     say('Проверяю доступ к общей папке Яндекс Диска…')
-    rc('lsf', remote(cfg))
+    check_shared_folder(cfg)
     atomic_json(CONFIG_FILE, cfg)
     say('Настройки сохранены: ' + str(CONFIG_FILE))
 
